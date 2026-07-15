@@ -1,6 +1,6 @@
 # SPockeR
 
-SPockeR is a SMIFs-based (Small Molecule Interaction Fields) pipeline for
+SPockeR is a SMIFs-based (Statistical Molecular Interaction Fields) pipeline for
 detecting, volumetrically defining, and scoring ligand-binding pockets in
 RNA 3D structures. It combines electrostatic (APBS), hydrophobic, base
 stacking, and hydrogen-bond donor/acceptor fields to identify unique
