@@ -1,0 +1,11 @@
+Fields_Pipeline1_*/
+Fields_Pipeline2_*/
+Analysis_Pipeline1_*/
+Analysis_Pipeline2_*/
+Analysis_Unique_Pockets_*/
+failed_pdbs_pipeline2.txt
+__pycache__/
+*.pyc
+.DS_Store
+*.mrc
+!data/example/**

@@ -1,0 +1,32 @@
+# Step 0 — Fix/clean the raw PDB structure
+./0_fix_pdb.sh MYPDB.pdb MYPDB_fixed.pdb
+
+# Step 1 — Generate Pipeline 1 fields (APBS, hydrophobic, stacking, etc.)
+./Pipeline1_Fields_Generation.sh MYPDB_fixed.pdb
+
+# Step 2 — Generate Pipeline 2 fields (HB acceptors/donors, electrostatics)
+./Pipeline2_Fields_Generation.sh MYPDB_fixed.pdb
+
+# Step 3 — Pipeline 1: derive slope-based fixed iso-values for hotspot detection
+python Script1_Pipeline1_Slope_Derived_Fixed_Iso_Values_for_Hotspot.py --input_dir Fields_Pipeline1_MYPDB_fixed --pdb_id MYPDB_fixed
+
+# Step 4 — Pipeline 1: detect binding-site hotspots
+python Script2_Pipeline1_Detection_of_Binding_Site_Hotspots.py --fields_dir Fields_Pipeline1_MYPDB_fixed --pdb_file MYPDB_fixed.pdb --analysis_dir Analysis_Pipeline1_MYPDB_fixed
+
+# Step 5 — Pipeline 1: build pocket volumes from hotspots
+python Script3_Pipeline1_Making_Pocket_Volume_Using_Hotspots.py --pdb_file MYPDB_fixed.pdb --analysis_dir Analysis_Pipeline1_MYPDB_fixed
+
+# Step 6 — Pipeline 2: hydrogen-bond pocket hotspots (HBA/HBD/ELE fields)
+python Script4_Pipeline2_Hydrogen_Bond_Pocket_Hotspots_Using_HBA_HBD_ELE_Fields.py --fields_dir Fields_Pipeline2_MYPDB_fixed --analysis_dir Analysis_Pipeline2_MYPDB_fixed
+
+# Step 7 — Pipeline 2: build hydrogen-bond pocket volumes
+python Script5_Pipeline2_Making_Hydrogen_Bond_Pocket_Volume.py --pdb_file MYPDB_fixed.pdb --analysis_dir Analysis_Pipeline2_MYPDB_fixed
+
+# Step 8 — Trim APBS field around RNA (for scoring unique pockets)
+python Script6_Trimming_APBS_for_Scoring_Unique_Pockets.py --fields_dir Fields_Pipeline1_MYPDB_fixed --pdb_file MYPDB_fixed.pdb --cutoff 5.0
+
+# Step 9 — Trim hydrophobic field to remove stacking overlap
+python Script7_Trimming_Hydrophobic_for_Scoring_Unique_Pockets.py --fields_dir Fields_Pipeline1_MYPDB_fixed --pdb_id MYPDB_fixed
+
+# Step 10 — Merge all pockets, trim, filter terminal artefacts, score & rank
+python Script8_Making_Unique_Pockets_Using_All_Previous_Pockets.py --analysis1_dir Analysis_Pipeline1_MYPDB_fixed --analysis2_dir Analysis_Pipeline2_MYPDB_fixed --fields_dir Fields_Pipeline1_MYPDB_fixed --pdb_file MYPDB_fixed.pdb

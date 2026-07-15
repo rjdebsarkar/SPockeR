@@ -1,0 +1,15 @@
+name: SPockeR
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9
+  - numpy
+  - scipy
+  - matplotlib
+  - biopython
+  - pdb-tools
+  - pdbfixer
+  - pip
+  - pip:
+      - mrcfile
+      - volgrids
