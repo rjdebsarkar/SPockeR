@@ -6,6 +6,17 @@ RNA 3D structures. It combines electrostatic (APBS), hydrophobic, base
 stacking, and hydrogen-bond donor/acceptor fields to identify unique
 druggable pockets, ranked by a physics-based composite score.
 
+## Pipeline overview
+
+**Pipeline 1 — Binding-Site Hotspot Detection**
+![Pipeline 1](docs/Pipeline1.png)
+
+**Pipeline 2 — Hydrogen-Bond Hotspot Detection**
+![Pipeline 2](docs/Pipeline2.jpg)
+
+**Pipeline 3 — Pocket Consolidation & Scoring**
+![Pipeline 3](docs/Pipeline3.jpg)
+
 ## System requirements
 - OS: Linux x86-64 (tested on Ubuntu 22.04)
 - Python 3.9+
@@ -42,14 +53,47 @@ Final ranked pockets are saved in `Analysis_Unique_Pockets_<pdb_id>/`:
 
 ## Repository structure
     SPockeR/
-    ├── scripts/    # all bash + Python pipeline scripts
-    ├── data/example/   # example PDB for testing
-    ├── docs/       # pipeline diagrams
-    ├── environment.yml
+    ├── scripts/
+    │   ├── 0_fix_pdb.sh
+    │   ├── Pipeline1_Fields_Generation.sh
+    │   ├── Pipeline2_Fields_Generation.sh
+    │   ├── Script1_Pipeline1_Slope_Derived_Fixed_Iso_Values_for_Hotspot.py
+    │   ├── Script2_Pipeline1_Detection_of_Binding_Site_Hotspots.py
+    │   ├── Script3_Pipeline1_Making_Pocket_Volume_Using_Hotspots.py
+    │   ├── Script4_Pipeline2_Hydrogen_Bond_Pocket_Hotspots_Using_HBA_HBD_ELE_Fields.py
+    │   ├── Script5_Pipeline2_Making_Hydrogen_Bond_Pocket_Volume.py
+    │   ├── Script6_Trimming_APBS_for_Scoring_Unique_Pockets.py
+    │   ├── Script7_Trimming_Hydrophobic_for_Scoring_Unique_Pockets.py
+    │   ├── Script8_Making_Unique_Pockets_Using_All_Previous_Pockets.py
+    │   └── indices_rna_hb_available_modified.py
+    ├── data/example/          # example PDB (1AJU) for quick testing
+    ├── docs/                  # pipeline diagrams and example output figures
+    ├── environment.yml        # conda environment specification
+    ├── Command_lines_step_by_step_SPockeR.txt
+    ├── LICENSE
     └── README.md
 
 ## License
 See LICENSE file.
 
 ## Contact
-Your name / email here.
+For questions or issues, please open an issue on GitHub or contact
+Raju Sarkar (rjdebsarkar@gmail.com).
+
+## Acknowledgments
+We thank the developers of the following open-source tools that SPockeR
+relies on:
+- volgrids 
+- APBS (electrostatics)
+- pdbfixer, pdb-tools (structure preparation)
+- molutils / RNApolis (RNA annotation)
+
+## Citation
+If you use SPockeR in your research, please cite:
+
+    @article{2026spocker,
+      author  = {Raju and ...},
+      title   = {SPockeR: A SMIFs-based pipeline for RNA ligand-binding pocket detection},
+      journal = {TBD},
+      year    = {2026}
+    }
