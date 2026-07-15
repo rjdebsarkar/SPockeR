@@ -316,6 +316,50 @@ def load_all_label_masks(pdb, analysis1_dir, hbond_dir):
     return all_found_labels, label_masks, label_voxels, label_origins
 
 
+def align_masks_to_common_grid(all_found_labels, label_masks, label_voxels,
+                                label_origins):
+    """
+    Pocket masks are produced by independent MRC-generation runs (whole-
+    structure fields vs. the HBond-specific fields sub-pipeline), so they
+    can live on grids with different shapes/origins even when the voxel
+    size matches. Boolean ops (overlap, union) require identical shapes,
+    so re-embed every mask into one common world-space grid before any
+    mask-vs-mask comparison happens.
+    """
+    if not all_found_labels:
+        return label_masks, label_voxels, label_origins
+
+    voxel_ref = None
+    for lbl in all_found_labels:
+        v = label_voxels[lbl]
+        if voxel_ref is None:
+            voxel_ref = v
+        elif not np.allclose(v, voxel_ref, atol=1e-3):
+            raise ValueError(
+                f"Cannot align pocket masks: '{lbl}' has voxel size {v}, "
+                f"expected {voxel_ref} (masks must share a voxel size to "
+                f"be merged onto a common grid)"
+            )
+
+    origins = np.array([label_origins[lbl] for lbl in all_found_labels], dtype=float)
+    shapes = np.array([label_masks[lbl].shape for lbl in all_found_labels], dtype=int)
+
+    global_origin = origins.min(axis=0)
+    offsets = np.rint((origins - global_origin[None, :]) / voxel_ref[None, :]).astype(int)
+    global_shape = tuple((offsets + shapes).max(axis=0))
+
+    aligned_masks = {}
+    for lbl, offset, shape in zip(all_found_labels, offsets, shapes):
+        full = np.zeros(global_shape, dtype=bool)
+        sl = tuple(slice(o, o + s) for o, s in zip(offset, shape))
+        full[sl] = label_masks[lbl]
+        aligned_masks[lbl] = full
+
+    aligned_voxels = {lbl: voxel_ref for lbl in all_found_labels}
+    aligned_origins = {lbl: global_origin for lbl in all_found_labels}
+    return aligned_masks, aligned_voxels, aligned_origins
+
+
 # -------------------------------------------------
 # SIGNIFICANT OVERLAP (UNCHANGED)
 # -------------------------------------------------
@@ -1129,6 +1173,9 @@ def main():
         print("  [SKIP]  No pocket MRC files found\n")
         return
     print(f"  Found labels: {all_found_labels}")
+
+    label_masks, label_voxels, label_origins = align_masks_to_common_grid(
+        all_found_labels, label_masks, label_voxels, label_origins)
 
     # ── Step 1: Build unique pockets (overlap-cluster + RNA-distance trim) ──
     unique_pockets = build_unique_pockets(
