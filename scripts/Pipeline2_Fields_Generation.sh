@@ -77,7 +77,6 @@ echo "=================================================="
     # ------------------------------------------------------------------
     cd "$PDB_DIR"
 
-    echo "ALL" $(molutils list resids "$FILE_NAME")
     echo "residues_nobp" $residues_nobp
 
     config_hbonds="GRID_FORMAT_OUTPUT=MRC DO_SMIF_APBS=true DO_SMIF_HBA=true DO_SMIF_HBD=true DO_SMIF_HYDROPHILIC=false DO_SMIF_HYDROPHOBIC=false DO_SMIF_STACKING=false HBONDS_ONLY_NUCLEOBASE=true"

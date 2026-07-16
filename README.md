@@ -86,7 +86,7 @@ relies on:
 - volgrids 
 - APBS (electrostatics)
 - pdbfixer, pdb-tools (structure preparation)
-- molutils / RNApolis (RNA annotation)
+- RNApolis (RNA annotation)
 
 ## Citation
 If you use SPockeR in your research, please cite:
