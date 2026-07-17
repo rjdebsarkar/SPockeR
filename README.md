@@ -31,22 +31,19 @@ conda activate spocker
 ```
 
 ## Usage (single PDB, e.g. 1AJU)
-See `Command_lines_step_by_step_SPockeR.txt` in this repo for the full
-10-step command sequence, or run directly from `scripts/`:
-```bash
-cd scripts
-./0_fix_pdb.sh ../data/example/1AJU.pdb 1AJU_fixed.pdb
-./Pipeline1_Fields_Generation.sh 1AJU_fixed.pdb
-./Pipeline2_Fields_Generation.sh 1AJU_fixed.pdb
-python Script1_Pipeline1_Slope_Derived_Fixed_Iso_Values_for_Hotspot.py --input_dir Fields_Pipeline1_1AJU_fixed --pdb_id 1AJU_fixed
-python Script2_Pipeline1_Detection_of_Binding_Site_Hotspots.py --fields_dir Fields_Pipeline1_1AJU_fixed --pdb_file 1AJU_fixed.pdb --analysis_dir Analysis_Pipeline1_1AJU_fixed
-python Script3_Pipeline1_Making_Pocket_Volume_Using_Hotspots.py --pdb_file 1AJU_fixed.pdb --analysis_dir Analysis_Pipeline1_1AJU_fixed
-python Script4_Pipeline2_Hydrogen_Bond_Pocket_Hotspots_Using_HBA_HBD_ELE_Fields.py --fields_dir Fields_Pipeline2_1AJU_fixed --analysis_dir Analysis_Pipeline2_1AJU_fixed
-python Script5_Pipeline2_Making_Hydrogen_Bond_Pocket_Volume.py --pdb_file 1AJU_fixed.pdb --analysis_dir Analysis_Pipeline2_1AJU_fixed
-python Script6_Trimming_APBS_for_Scoring_Unique_Pockets.py --fields_dir Fields_Pipeline1_1AJU_fixed --pdb_file 1AJU_fixed.pdb --cutoff 5.0
-python Script7_Trimming_Hydrophobic_for_Scoring_Unique_Pockets.py --fields_dir Fields_Pipeline1_1AJU_fixed --pdb_id 1AJU_fixed
-python Script8_Making_Unique_Pockets_Using_All_Previous_Pockets.py --analysis1_dir Analysis_Pipeline1_1AJU_fixed --analysis2_dir Analysis_Pipeline2_1AJU_fixed --fields_dir Fields_Pipeline1_1AJU_fixed --pdb_file 1AJU_fixed.pdb
-```
+
+Step 1 — clean/fix the raw PDB structure (required, run manually first):
+
+    cd scripts
+    ./0_fix_pdb.sh ../data/example/1AJU.pdb 1AJU_fixed.pdb
+
+Step 2 — run the full pipeline on the fixed PDB:
+
+    bash run_pipeline_new_spocker.sh 1AJU_fixed.pdb ../Analysis_Unique_Pockets_1AJU_fixed
+
+Add `--keep-intermediate` as a third argument to inspect the intermediate
+Fields_Pipeline1_*/Fields_Pipeline2_*/Analysis_Pipeline1_*/Analysis_Pipeline2_*
+directories instead of having them cleaned up automatically.
 
 ## Output
 Final ranked pockets are saved in `Analysis_Unique_Pockets_<pdb_id>/`:
@@ -58,8 +55,11 @@ Final ranked pockets are saved in `Analysis_Unique_Pockets_<pdb_id>/`:
     SPockeR/
     ├── scripts/
     │   ├── 0_fix_pdb.sh
-    │   ├── Pipeline1_Fields_Generation.sh
-    │   ├── Pipeline2_Fields_Generation.sh
+    │   ├── run_pipeline_new_spocker.sh
+    │   ├── _fields.py
+    │   ├── _residues.py
+    │   ├── _structure.py
+    │   ├── _new_spocker_prepare_fields.py
     │   ├── Script1_Pipeline1_Slope_Derived_Fixed_Iso_Values_for_Hotspot.py
     │   ├── Script2_Pipeline1_Detection_of_Binding_Site_Hotspots.py
     │   ├── Script3_Pipeline1_Making_Pocket_Volume_Using_Hotspots.py
@@ -67,12 +67,10 @@ Final ranked pockets are saved in `Analysis_Unique_Pockets_<pdb_id>/`:
     │   ├── Script5_Pipeline2_Making_Hydrogen_Bond_Pocket_Volume.py
     │   ├── Script6_Trimming_APBS_for_Scoring_Unique_Pockets.py
     │   ├── Script7_Trimming_Hydrophobic_for_Scoring_Unique_Pockets.py
-    │   ├── Script8_Making_Unique_Pockets_Using_All_Previous_Pockets.py
-    │   └── indices_rna_hb_available_modified.py
+    │   └── Script8_Making_Unique_Pockets_Using_All_Previous_Pockets.py
     ├── data/example/          # example PDB (1AJU) for quick testing
     ├── docs/                  # pipeline diagrams and example output figures
     ├── environment.yml        # conda environment specification
-    ├── Command_lines_step_by_step_SPockeR.txt
     ├── LICENSE
     └── README.md
 
