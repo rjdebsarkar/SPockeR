@@ -16,3 +16,4 @@ dependencies:
   - pip:
       - mrcfile
       - volgrids==1.0.0
+      - rnapolis
