@@ -19,7 +19,7 @@ druggable pockets, ranked by a physics-based composite score.
 
 ## System requirements
 - OS: Linux x86-64 (tested on Ubuntu 22.04)
-- Python 3.9+
+- Python 3.10+
 - No GPU required
 
 ## Installation
