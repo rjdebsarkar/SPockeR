@@ -55,7 +55,7 @@ def _canonical_pair_resids(pdb_path: Path) -> set:
                 structure3d = read_3d_structure(handle_input_file(pdb_path), None)
                 base_interactions = extract_base_interactions(structure3d)
                 structure2d, _ = structure3d.extract_secondary_structure(
-                    base_interactions, False, False
+                    base_interactions, False
                 )
                 write_csv(csv_path, structure2d)
             df = pd.read_csv(csv_path)
