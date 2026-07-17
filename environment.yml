@@ -9,8 +9,6 @@ dependencies:
   - biopython
   - pdb-tools
   - pdbfixer
-  - mdanalysis
-  - h5py
   - pip
   - pip:
       - mrcfile
