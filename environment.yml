@@ -10,6 +10,8 @@ dependencies:
   - biopython
   - pdb-tools
   - pdbfixer
+  - pdb2pqr
+  - apbs
   - pip
   - pip:
       - mrcfile
