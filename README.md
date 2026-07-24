@@ -86,22 +86,27 @@ Final ranked pockets are saved in `Analysis_Unique_Pockets_<pdb_id>/`:
 - `<pdb>_field_contributions.png`
 
 ## Repository structure
-   SPockeR/
+SPockeR/
 ├── scripts/
-│ ├── 0_fix_pdb.sh
-│ ├── run_pipeline_new_spocker.sh
-│ ├── _fields.py
-│ ├── _residues.py
-│ ├── _structure.py
-│ ├── _new_spocker_prepare_fields.py
-│ ├── Script1_Pipeline1_Slope_Derived_Fixed_Iso_Values_for_Hotspot.py
-│ ├── Script2_Pipeline1_Detection_of_Binding_Site_Hotspots.py
-│ ├── Script3_Pipeline1_Making_Pocket_Volume_Using_Hotspots.py
-│ ├── Script4_Pipeline2_Hydrogen_Bond_Pocket_Hotspots_Using_HBA_HBD_ELE_Fields.py
-│ ├── Script5_Pipeline2_Making_Hydrogen_Bond_Pocket_Volume.py
-│ ├── Script6_Trimming_APBS_for_Scoring_Unique_Pockets.py
-│ ├── Script7_Trimming_Hydrophobic_for_Scoring_Unique_Pockets.py
-│ └── Script8_Making_Unique_Pockets_Using_All_Previous_Pockets.py
+│ ├── run_pipeline_new_spocker.sh # main entry point — orchestrates the full pipeline
+│ ├── 0_fix_pdb.sh # Step 0: PDB cleaning/fixing
+│ │
+│ ├── _new_spocker_prepare_fields.py # Field generation (replaces legacy volgrids CLI calls)
+│ ├── _fields.py # SMIF/APBS field computation helpers
+│ ├── _residues.py # Non-canonical residue detection (rnapolis-based)
+│ ├── _structure.py # PDB structure parsing helpers
+│ │
+│ ├── Script1_Pipeline1_Slope_Derived_Fixed_Iso_Values_for_Hotspot.py # Pipeline 1, step 1
+│ ├── Script2_Pipeline1_Detection_of_Binding_Site_Hotspots.py # Pipeline 1, step 2
+│ ├── Script3_Pipeline1_Making_Pocket_Volume_Using_Hotspots.py # Pipeline 1, step 3
+│ │
+│ ├── Script4_Pipeline2_Hydrogen_Bond_Pocket_Hotspots_Using_HBA_HBD_ELE_Fields.py # Pipeline 2, step 1
+│ ├── Script5_Pipeline2_Making_Hydrogen_Bond_Pocket_Volume.py # Pipeline 2, step 2
+│ │
+│ ├── Script6_Trimming_APBS_for_Scoring_Unique_Pockets.py # Pipeline 3, step 1
+│ ├── Script7_Trimming_Hydrophobic_for_Scoring_Unique_Pockets.py # Pipeline 3, step 2
+│ └── Script8_Making_Unique_Pockets_Using_All_Previous_Pockets.py # Pipeline 3, step 3 (final scoring/merge)
+│
 ├── data/example/ # example PDB (1AJU) for quick testing
 ├── docs/ # pipeline diagrams and example output figures
 ├── environment.yml # conda environment specification (env name: SPockeR)
