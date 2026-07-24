@@ -86,7 +86,6 @@ Final ranked pockets are saved in `Analysis_Unique_Pockets_<pdb_id>/`:
 - `<pdb>_field_contributions.png`
 
 ## Repository structure
-\```
 SPockeR/
 ├── scripts/
 │   ├── run_pipeline_new_spocker.sh          # main entry point — orchestrates the full pipeline
@@ -113,7 +112,6 @@ SPockeR/
 ├── environment.yml        # conda environment specification (env name: SPockeR)
 ├── LICENSE
 └── README.md
-\```
 
 ## Contact
 For questions or issues, please open an issue on GitHub or contact
