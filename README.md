@@ -86,8 +86,6 @@ Final ranked pockets are saved in `Analysis_Unique_Pockets_<pdb_id>/`:
 - `<pdb>_field_contributions.png`
 
 ## Repository structure
-## Repository structure
-
 \```
 SPockeR/
 ├── scripts/
