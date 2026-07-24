@@ -1,3 +1,4 @@
+cat > README.md << 'EOF'
 # SPockeR
 
 SPockeR is a SMIFs-based (Statistical Molecular Interaction Fields) pipeline for
@@ -136,3 +137,4 @@ If you use SPockeR in your research, please cite:
       journal = {TBD},
       year    = {2026}
     }
+EOF
