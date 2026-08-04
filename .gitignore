@@ -8,4 +8,10 @@ __pycache__/
 *.pyc
 .DS_Store
 *.mrc
+scripts/testdata/
+scripts/*_fixed.pdb
+io.mc
+
 !data/example/**
+!Analysis_Unique_Pockets_1AKX_fixed/
+!Analysis_Unique_Pockets_1AKX_fixed/**

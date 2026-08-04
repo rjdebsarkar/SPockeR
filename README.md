@@ -21,7 +21,7 @@ druggable pockets, ranked by a physics-based composite score.
 - OS: Linux x86-64 (tested on Ubuntu 22.04)
 - Python 3.11+
 - No GPU required
-- Key pinned dependencies: volgrids==1.0.0, rnapolis==0.11.5 (see `environment.yml`)
+- Key pinned dependencies: volgrids==1.0.0  (see `environment.yml`)
 
 ## Installation
 ```bash
@@ -36,25 +36,25 @@ export PYTHONNOUSERSITE=1
 > of `environment.yml`. If you rename the environment in `environment.yml`,
 > update this command accordingly.
 
-## Usage (single PDB, e.g. 1AJU)
+## Usage (single PDB, e.g. 1AKX)
 
 Step 1 — clean/fix the raw PDB structure (required, run manually first):
 
 ```bash
 cd scripts
-./0_fix_pdb.sh ../data/example/1AJU.pdb 1AJU_fixed.pdb
+./0_fix_pdb.sh ../data/example/1AKX.pdb 1AKX_fixed.pdb
 ```
 
 Step 2 — run the full pipeline on the fixed PDB:
 
 **Without keeping intermediate files** (default — recommended for large batch runs):
 ```bash
-bash run_pipeline_new_spocker.sh 1AJU_fixed.pdb ../Analysis_Unique_Pockets_1AJU_fixed
+bash run_pipeline_new_spocker.sh 1AKX_fixed.pdb ../Analysis_Unique_Pockets_1AKX_fixed
 ```
 
 **With intermediate files preserved** (useful for debugging / inspecting individual field/hotspot stages):
 ```bash
-bash run_pipeline_new_spocker.sh 1AJU_fixed.pdb ../Analysis_Unique_Pockets_1AJU_fixed --keep-intermediate
+bash run_pipeline_new_spocker.sh 1AKX_fixed.pdb ../Analysis_Unique_Pockets_1AKX_fixed --keep-intermediate
 ```
 
 With `--keep-intermediate`, the `Fields_Pipeline1_*/`, `Fields_Pipeline2_*/`,
@@ -89,28 +89,26 @@ Final ranked pockets are saved in `Analysis_Unique_Pockets_<pdb_id>/`:
 ```bash
 SPockeR/
 ├── scripts/
-│ ├── run_pipeline_new_spocker.sh # main entry point — orchestrates the full pipeline
-│ ├── 0_fix_pdb.sh # Step 0: PDB cleaning/fixing
-│ │
-│ ├── _new_spocker_prepare_fields.py # Field generation (replaces legacy volgrids CLI calls)
-│ ├── _fields.py # SMIF/APBS field computation helpers
-│ ├── _residues.py # Non-canonical residue detection (rnapolis-based)
-│ ├── _structure.py # PDB structure parsing helpers
-│ │
-│ ├── Script1_Pipeline1_Slope_Derived_Fixed_Iso_Values_for_Hotspot.py
-│ ├── Script2_Pipeline1_Detection_of_Binding_Site_Hotspots.py
-│ ├── Script3_Pipeline1_Making_Pocket_Volume_Using_Hotspots.py
-│ │
-│ ├── Script4_Pipeline2_Hydrogen_Bond_Pocket_Hotspots_Using_HBA_HBD_ELE_Fields.py
-│ ├── Script5_Pipeline2_Making_Hydrogen_Bond_Pocket_Volume.py
-│ │
-│ ├── Script6_Trimming_APBS_for_Scoring_Unique_Pockets.py
-│ ├── Script7_Trimming_Hydrophobic_for_Scoring_Unique_Pockets.py
-│ └── Script8_Making_Unique_Pockets_Using_All_Previous_Pockets.py
+│   ├── run_pipeline_new_spocker.sh          # main entry point — orchestrates the full pipeline
+│   ├── 0_fix_pdb.sh                         # Step 0: PDB cleaning/fixing
+│   │
+│   ├── _new_spocker_prepare_fields.py       # Field generation (native volgrids 1.0.0 CLI workflow)
+│   ├── _fields.py                           # SMIF/APBS field computation helpers
+│   │
+│   ├── Script1_Pipeline1_Slope_Derived_Fixed_Iso_Values_for_Hotspot.py
+│   ├── Script2_Pipeline1_Detection_of_Binding_Site_Hotspots.py
+│   ├── Script3_Pipeline1_Making_Pocket_Volume_Using_Hotspots.py
+│   │
+│   ├── Script4_Pipeline2_Hydrogen_Bond_Pocket_Hotspots_Using_HBA_HBD_ELE_Fields.py
+│   ├── Script5_Pipeline2_Making_Hydrogen_Bond_Pocket_Volume.py
+│   │
+│   ├── Script6_Trimming_APBS_for_Scoring_Unique_Pockets.py
+│   ├── Script7_Trimming_Hydrophobic_for_Scoring_Unique_Pockets.py
+│   └── Script8_Making_Unique_Pockets_Using_All_Previous_Pockets.py
 │
-├── data/example/ # example PDB (1AJU) for quick testing
-├── docs/ # pipeline diagrams and example output figures
-├── environment.yml # conda environment specification (env name: SPockeR)
+├── data/example/        # example PDB(s) for quick testing
+├── docs/                 # pipeline diagrams and example output figures
+├── environment.yml       # conda environment specification (env name: SPockeR)
 ├── LICENSE
 └── README.md
 ```
@@ -125,7 +123,6 @@ relies on:
 - volgrids
 - pdb2pqr, APBS (electrostatics)
 - pdbfixer, pdb-tools (structure preparation)
-- RNApolis (RNA annotation)
 
 ## Citation
 If you use SPockeR in your research, please cite:
