@@ -67,17 +67,18 @@ copy them elsewhere first if you need to keep results from multiple PDBs.
 
 ## Batch usage (multiple PDBs)
 
-To run SPockeR over a directory of PDB files, loop over Steps 1–2 above for
-each structure, e.g.:
+To run SPockeR over a directory of PDB files, use the provided batch script:
 
-```bash
+​```bash
 cd scripts
-for pdb in /path/to/pdb_directory/*.pdb; do
-    id=$(basename "$pdb" .pdb)
-    ./0_fix_pdb.sh "$pdb" "${id}_fixed.pdb"
-    bash run_pipeline_new_spocker.sh "${id}_fixed.pdb" "../Analysis_Unique_Pockets_${id}"
-done
-```
+./batch_run_all_pdbs.sh /path/to/pdb_directory
+​```
+
+For each `<id>.pdb` found, this runs Steps 1–2 above automatically:
+- fixed structures are saved to `data/fixed_pdbs/<id>_fixed.pdb`
+- final ranked pockets are saved to `Analysis_Unique_Pockets_<id>/`
+- any PDB that fails at either step is logged (with the reason) to
+  `failed_pdbs.txt` and the batch continues with the remaining structures
 
 ## Output
 Final ranked pockets are saved in `Analysis_Unique_Pockets_<pdb_id>/`:
@@ -91,6 +92,7 @@ SPockeR/
 ├── scripts/
 │   ├── run_pipeline_new_spocker.sh          # main entry point — orchestrates the full pipeline
 │   ├── 0_fix_pdb.sh                         # Step 0: PDB cleaning/fixing
+│   ├── batch_run_all_pdbs.sh                # runs the full pipeline over a directory of PDBs
 │   │
 │   ├── _new_spocker_prepare_fields.py       # Field generation (native volgrids 1.0.0 CLI workflow)
 │   ├── _fields.py                           # SMIF/APBS field computation helpers
