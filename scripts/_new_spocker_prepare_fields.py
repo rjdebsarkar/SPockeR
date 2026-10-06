@@ -1,26 +1,16 @@
 #!/usr/bin/env python3
 """
-Generate SMIF fields for a single PDB using the current volgrids (1.0.0)
-CLI (via the local _fields.py / _residues.py in this folder), and place them
-under the Fields_Pipeline1_<PDB_ID>/ / Fields_Pipeline2_<PDB_ID>/ directory
-+ filename convention that this folder's Script1-8 expect.
+Generate SMIF fields for a single PDB using volgrids 1.0.0's own CLI
+workflow end-to-end, including its native `smutils res_nobp` for
+non-canonical residue selection.
 
-Pipeline1_Fields_Generation.sh and Pipeline2_Fields_Generation.sh (also in
-this folder) call `volgrids smiffer rna ...` followed by `volgrids vgtools
-unpack`/`convert`, and Pipeline2's config uses DO_SMIF_*-style keys -- none
-of which exist in volgrids 1.0.0 anymore (see demo_spocker/legacy/README.md;
-the same break was already worked around for legacy/ via
-demo_spocker/_legacy_prepare_inputs.py, which this script mirrors).
-volgrids 1.0.0's `volgrids smiffer <pdb> ...` writes per-field .mrc files
-directly, so no unpack/convert step is needed at all -- _fields.py already
-wraps the current CLI correctly (it's a local copy of
-demo_spocker/pipeline/fields.py, kept in this folder so new_spocker/ has no
-runtime dependency outside itself), so field generation here just reuses it.
-Only field generation is reused -- Script1-8 (the actual hotspot /
-pocket-detection / scoring algorithms) never call volgrids themselves, only
-read the resulting .mrc files, so they run untouched.
+The HBond-subset call no longer produces its own APBS field (SMIF_APBS is
+forced false there -- see _fields.py's module docstring for why). If
+downstream scoring scripts (Script4/5/6) expect an APBS file inside
+Fields_Pipeline2_*, the whole-structure one is copied over as a stand-in;
+remove that copy step below if it turns out not to be needed.
 
-Usage: python3 _new_spocker_prepare_fields.py <input.pdb> <work_dir> <pdb_id>
+Usage: python3 _new_spocker_prepare_fields.py <pdb> <work_dir> <pdb_id>
 """
 
 import shutil
@@ -29,12 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _fields as fields
-import _residues as residues
-import _structure as structure
 
-# semantic field name (_fields.py) -> new_spocker file suffix (matches
-# Script1-8's filename parsing, e.g. Script1's parse_name() and Script4's
-# "<name>.hbacceptors.mrc" expectations).
 NEW_SPOCKER_FIELD_NAME = {
     "apbs": "apbs",
     "stacking": "stacking",
@@ -52,7 +37,7 @@ def _place(semantic_paths: dict, dest_dir: Path, pdb_id: str):
 
 def main():
     if len(sys.argv) != 4:
-        sys.exit(f"Usage: {sys.argv[0]} <input.pdb> <work_dir> <pdb_id>")
+        sys.exit(f"Usage: {sys.argv[0]} <pdb> <work_dir> <pdb_id>")
     pdb_path = Path(sys.argv[1]).resolve()
     work_dir = Path(sys.argv[2]).resolve()
     pdb_id = sys.argv[3]
@@ -68,15 +53,22 @@ def main():
     whole_paths = fields.compute_whole_structure_fields(local_pdb, apbs_cache, field_work / "whole")
     _place(whole_paths, fields1_dir, pdb_id)
 
-    struct = structure.load_structure(local_pdb)
-    selectors = residues.non_canonical_residue_selectors(local_pdb, struct)
-    if selectors:
-        print(f"[prepare-fields] generating hydrogen-bond fields for "
-              f"{len(selectors)} non-canonical residue(s)")
-        hb_paths = fields.compute_hbond_subset_fields(local_pdb, selectors, apbs_cache, field_work / "hbond")
+    indices = fields.compute_non_canonical_indices(local_pdb)
+    if indices:
+        n = len(indices.split())
+        print(f"[prepare-fields] generating hydrogen-bond fields for {n} non-base-paired residue(s): {indices}")
+        hb_paths = fields.compute_hbond_subset_fields(local_pdb, indices, field_work / "hbond")
         _place(hb_paths, fields2_dir, pdb_id)
+
+        # HBond-subset call produces no APBS field of its own (SMIF_APBS=false
+        # there); reuse the whole-structure one in Fields_Pipeline2_ in case
+        # Script4/5/6 expect an .apbs.mrc file alongside hbacceptors/hbdonors.
+        pipeline1_apbs = fields1_dir / f"{pdb_id}.apbs.mrc"
+        pipeline2_apbs = fields2_dir / f"{pdb_id}.apbs.mrc"
+        if pipeline1_apbs.exists():
+            shutil.copy(pipeline1_apbs, pipeline2_apbs)
     else:
-        print("[prepare-fields] no non-canonical residues found; HBond fields skipped")
+        print("[prepare-fields] no non-base-paired residues found; HBond fields skipped")
 
 
 if __name__ == "__main__":

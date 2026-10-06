@@ -137,10 +137,33 @@ def pick_global_minimum(centers, deriv1, threshold_x):
     d = deriv1[mask]
     idx = int(np.argmin(d))
 
+    # Additional checkpoint for STK/HPb only (this function is used only
+    # for those two fields): a derivative minimum at the final/highest-field
+    # histogram bin is a boundary effect, not an interior slope transition.
+    # In that case, reject the terminal point and use the strongest remaining
+    # interior local minimum (the second-most-dominant slope-changing point).
+    if idx == len(d) - 1 and len(d) > 2:
+        interior_minima, _ = find_peaks(-d)
+        interior_minima = interior_minima[
+            (interior_minima > 0) & (interior_minima < len(d) - 1)
+        ]
+
+        if len(interior_minima) > 0:
+            idx = int(interior_minima[np.argmin(d[interior_minima])])
+        else:
+            # Defensive fallback for a monotonic derivative with no interior
+            # local minimum: exclude the terminal bin and retain the most
+            # negative non-terminal value so that no threshold is lost.
+            idx = int(np.argmin(d[:-1]))
+
+        method = "slope_minimum_terminal_rejected_second_dominant"
+    else:
+        method = "slope_minimum"
+
     return {
         "x": float(c[idx]),
         "metric": float(d[idx]),
-        "method": "slope_minimum",
+        "method": method,
     }
 
 

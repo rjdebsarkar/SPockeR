@@ -22,18 +22,38 @@
 # through this pipeline lives right here, with no runtime dependency on
 # demo_spocker/.
 #
-# Usage: bash run_pipeline_new_spocker.sh <input.pdb> <output_dir> [--keep-intermediate]
+# Usage: bash run_pipeline_new_spocker.sh <input.pdb> <output_dir> [--keep-intermediate] [--pocket-mode sphere|fluid|both]
+#   --pocket-mode sphere  (default) original 8 A seed-sphere pockets of Script3/Script5
+#   --pocket-mode fluid   Script3b fluid pockets replace them before Script8
+#   --pocket-mode both    fields computed once, scored twice: <out>/sphere and <out>/fluid
+# Hotspots (Script1-5 outputs, sphere per-hotspot pockets) are kept in <out>/hotspots.
+# SPOCKER_WORK_DIR overrides the work dir (needed to run several PDBs in parallel).
 set -euo pipefail
 
+USAGE="Usage: $0 <input.pdb> <output_dir> [--keep-intermediate] [--pocket-mode sphere|fluid|both]"
 if [[ $# -lt 2 ]]; then
-    echo "Usage: $0 <input.pdb> <output_dir> [--keep-intermediate]"
+    echo "$USAGE"
     exit 1
 fi
 
 PDB_PATH=$(realpath "$1")
 OUT_DIR=$(realpath -m "$2")
+shift 2
 KEEP_INTERMEDIATE=0
-[[ "${3:-}" == "--keep-intermediate" ]] && KEEP_INTERMEDIATE=1
+POCKET_MODE=sphere
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --keep-intermediate) KEEP_INTERMEDIATE=1 ;;
+        --pocket-mode) POCKET_MODE="${2:-}"; shift ;;
+        --pocket-mode=*) POCKET_MODE="${1#*=}" ;;
+        *) echo "Unknown option: $1"; echo "$USAGE"; exit 1 ;;
+    esac
+    shift
+done
+if [[ "$POCKET_MODE" != "sphere" && "$POCKET_MODE" != "fluid" && "$POCKET_MODE" != "both" ]]; then
+    echo "!!! --pocket-mode must be 'sphere', 'fluid' or 'both' (got '$POCKET_MODE')"
+    exit 1
+fi
 
 # _new_spocker_prepare_fields.py and Script1/2/3/6/7/8 all derive the PDB
 # identifier from the input filename's stem, so the caller's chosen filename
@@ -44,7 +64,7 @@ PDB_ID="${PDB_ID%.*}"
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 NEW_SPOCKER_DIR="$SCRIPT_DIR"
-WORK="$SCRIPT_DIR/testdata/new_spocker_work"
+WORK="${SPOCKER_WORK_DIR:-$SCRIPT_DIR/testdata/new_spocker_work}"
 
 # Always start from a clean work dir: a previous --keep-intermediate run (or
 # an interrupted one) can leave stale per-PDB field/analysis files behind
@@ -93,16 +113,47 @@ else
     echo ">>> No non-canonical residues / HBond fields; skipping Script4/5"
 fi
 
-echo ">>> Merging pockets and scoring"
-run_step Script8 "$NEW_SPOCKER_DIR/Script8_Making_Unique_Pockets_Using_All_Previous_Pockets.py" \
-    --analysis1_dir "$ANALYSIS1_DIR" --analysis2_dir "$ANALYSIS2_DIR" --fields_dir "$FIELDS1_DIR" \
-    --pdb_file "$PDB_PATH" --pdb_id "$PDB_ID" --output_dir "$OUT_DIR"
+# Keep the hotspots (markers, Script1/2 tables, sphere per-hotspot pockets)
+# before Script3b overwrites the pocket files.
+mkdir -p "$OUT_DIR/hotspots"
+for d in "$ANALYSIS1_DIR" "$ANALYSIS2_DIR"; do
+    [[ -d "$d" ]] && cp -r "$d" "$OUT_DIR/hotspots/"
+done
 
-if [[ ! -f "$OUT_DIR/${PDB_ID}_field_contributions.csv" ]]; then
-    echo "!!! Script8 produced no field-contributions CSV in $OUT_DIR"
-    exit 1
-fi
+# Script8 exits non-zero / writes no CSV when no viable pocket remains.
+score() {
+    local dest="$1"
+    mkdir -p "$dest"
+    echo ">>> Merging pockets and scoring ($2 pockets)"
+    run_step Script8 "$NEW_SPOCKER_DIR/Script8_Making_Unique_Pockets_Using_All_Previous_Pockets.py" \
+        --analysis1_dir "$ANALYSIS1_DIR" --analysis2_dir "$ANALYSIS2_DIR" --fields_dir "$FIELDS1_DIR" \
+        --pdb_file "$PDB_PATH" --pdb_id "$PDB_ID" --output_dir "$dest" || true
+    if [[ ! -f "$dest/${PDB_ID}_field_contributions.csv" ]]; then
+        echo "!!! Script8 ($2) produced no field-contributions CSV in $dest"
+        return 1
+    fi
+}
+
+fluid() {
+    # Needs Script6/7 trimmed fields and Script3/5 outputs; overwrites the
+    # sphere pocket files under their pipeline names so Script8 picks them up.
+    run_step Script3b "$NEW_SPOCKER_DIR/Script3b_Fluid_Pocket_Volume_From_Hotspots_v3.py" \
+        --pdb_file "$PDB_PATH" --pdb_id "$PDB_ID" --fields_dir "$FIELDS1_DIR" \
+        --analysis1_dir "$ANALYSIS1_DIR" --analysis2_dir "$ANALYSIS2_DIR" \
+        --output_dir "$1" --pipeline_names
+}
+
+RC=0
+case "$POCKET_MODE" in
+    sphere) score "$OUT_DIR" sphere || RC=1 ;;
+    fluid)  if fluid "$OUT_DIR/hotspots/fluid_pockets"; then score "$OUT_DIR" fluid || RC=1; else RC=1; fi ;;
+    both)
+        score "$OUT_DIR/sphere" sphere || RC=1
+        if fluid "$OUT_DIR/fluid/hotspot_pockets"; then score "$OUT_DIR/fluid" fluid || RC=1
+        else echo "!!! Script3b failed; no fluid scoring"; RC=1; fi ;;
+esac
 
 if [[ "$KEEP_INTERMEDIATE" -eq 0 ]]; then
     rm -rf "$WORK"
 fi
+exit $RC

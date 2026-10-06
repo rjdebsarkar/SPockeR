@@ -25,6 +25,16 @@ POCKET_SPECS = [
         "label":  "second STK-HPb pocket",
     },
     {
+        "tag":    "stk_hpb_third",
+        "suffix": ".stacking_hydrophobic_third_pocket.mrc",
+        "label":  "third STK-HPb pocket",
+    },
+    {
+        "tag":    "stk_hpb_fourth",
+        "suffix": ".stacking_hydrophobic_fourth_pocket.mrc",
+        "label":  "fourth STK-HPb pocket",
+    },
+    {
         "tag":    "stk_ele",
         "suffix": ".stacking_electrostatic_pocket.mrc",
         "label":  "STK-ELE pocket",
