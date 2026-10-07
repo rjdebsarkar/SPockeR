@@ -8,9 +8,10 @@ from scipy import ndimage
 from scipy.spatial import cKDTree
 
 # -------------------------------------------------
-# Parameters (UNCHANGED)
+# Parameters (extended for small pair partners in ranks 3 and 4)
 # -------------------------------------------------
 MIN_COMPONENT_VOXELS          = 8
+MIN_MINOR_PAIR_COMPONENT_VOXELS = 1
 CLOSE_DISTANCE_ANGSTROM       = 3.5
 VERY_CLOSE_DISTANCE_ANGSTROM  = 1.5
 
@@ -285,11 +286,14 @@ def load_structure_atoms(pdb_path):
     return np.array(atoms, dtype=float)
 
 # -------------------------------------------------
-# Geometry helpers (UNCHANGED)
+# Geometry helpers (MRC array order converted from ZYX to Cartesian XYZ)
 # -------------------------------------------------
 def mask_indices_to_xyz(idx, voxel_size, origin):
-    ijk = np.column_stack(idx).astype(float)
-    return ijk * voxel_size + origin
+    # NumPy arrays returned by mrcfile are indexed as (z, y, x), whereas
+    # voxel_size and origin are stored in Cartesian (x, y, z) order.
+    zyx = np.column_stack(idx).astype(float)
+    xyz_indices = zyx[:, [2, 1, 0]]
+    return xyz_indices * voxel_size + origin
 
 def component_mask_from_indices(shape, idx):
     m = np.zeros(shape, dtype=bool)
@@ -317,8 +321,9 @@ def triple_overlap_mask(shape, idx1, idx2, idx3):
     return m, int(np.count_nonzero(m))
 
 def min_distance_between_components(idx1, idx2, voxel_size):
-    a = np.column_stack(idx1).astype(float) * voxel_size
-    b = np.column_stack(idx2).astype(float) * voxel_size
+    zero_origin = np.zeros(3, dtype=float)
+    a = mask_indices_to_xyz(idx1, voxel_size, zero_origin)
+    b = mask_indices_to_xyz(idx2, voxel_size, zero_origin)
     if len(a) == 0 or len(b) == 0:
         return np.inf
     min_d2 = np.inf
@@ -343,8 +348,9 @@ def pair_distance_bonus(dist):
     )
 
 def localized_proximity_mask(shape, idx1, idx2, voxel_size, cutoff):
-    xyz1 = np.column_stack(idx1).astype(float) * voxel_size
-    xyz2 = np.column_stack(idx2).astype(float) * voxel_size
+    zero_origin = np.zeros(3, dtype=float)
+    xyz1 = mask_indices_to_xyz(idx1, voxel_size, zero_origin)
+    xyz2 = mask_indices_to_xyz(idx2, voxel_size, zero_origin)
     if len(xyz1) == 0 or len(xyz2) == 0:
         return np.zeros(shape, dtype=bool)
     tree2 = cKDTree(xyz2)
@@ -380,7 +386,7 @@ def build_stk_ele_pocket_mask(shape, stk_comp, apbs_comp, voxel_size):
     return prox_mask, "stk_ele_proximity_localized"
 
 # -------------------------------------------------
-# Buriedness / scoring (UNCHANGED)
+# Buriedness / scoring
 # -------------------------------------------------
 def estimate_real_buriedness_from_atoms(component_xyz, atom_xyz):
     if len(component_xyz) == 0 or len(atom_xyz) == 0:
@@ -402,12 +408,13 @@ def estimate_real_buriedness_from_atoms(component_xyz, atom_xyz):
     )
     return float(np.clip(buriedness, 0.0, 1.0))
 
-def component_stats(labels, nlab, data, voxel_size, origin, atom_xyz, field_name):
+def component_stats(labels, nlab, data, voxel_size, origin, atom_xyz, field_name,
+                    min_component_voxels=MIN_COMPONENT_VOXELS):
     comps = []
     for lab in range(1, nlab + 1):
         idx  = np.where(labels == lab)
         nvox = len(idx[0])
-        if nvox < MIN_COMPONENT_VOXELS:
+        if nvox < min_component_voxels:
             continue
         vals       = data[idx]
         vals_score = np.abs(vals) if field_name == "apbs" else vals
@@ -415,7 +422,7 @@ def component_stats(labels, nlab, data, voxel_size, origin, atom_xyz, field_name
         density    = total / nvox
         centroid_idx = np.array([np.mean(idx[0]), np.mean(idx[1]),
                                  np.mean(idx[2])], dtype=float)
-        centroid_xyz = centroid_idx * voxel_size + origin
+        centroid_xyz = centroid_idx[[2, 1, 0]] * voxel_size + origin
         comp_xyz     = mask_indices_to_xyz(idx, voxel_size, origin)
         real_buriedness = estimate_real_buriedness_from_atoms(comp_xyz, atom_xyz)
         comps.append({
@@ -561,10 +568,11 @@ def summarize_pocket(mask, components, pocket_type, shape, voxel_size, origin,
                      atom_xyz, stk_data, hyd_data, apbs_data):
     if mask is None or np.count_nonzero(mask) == 0:
         return None
-    coords       = np.column_stack(np.where(mask))
+    mask_indices = np.where(mask)
+    coords       = np.column_stack(mask_indices)
     centroid_idx = coords.mean(axis=0)
-    centroid_xyz = centroid_idx * voxel_size + origin
-    pocket_xyz   = coords * voxel_size + origin
+    centroid_xyz = centroid_idx[[2, 1, 0]] * voxel_size + origin
+    pocket_xyz   = mask_indices_to_xyz(mask_indices, voxel_size, origin)
     pocket_buriedness = estimate_real_buriedness_from_atoms(pocket_xyz, atom_xyz)
     relevance = compute_relevance_scores(mask, stk_data, hyd_data, apbs_data)
 
@@ -594,6 +602,8 @@ def summarize_pocket(mask, components, pocket_type, shape, voxel_size, origin,
         "stacking_electrostatic":     "aromatic_charge_supported",
         "stacking_hydrophobic":       "aromatic_hydrophobic_preferred",
         "stacking_hydrophobic_second":"aromatic_hydrophobic_preferred",
+        "stacking_hydrophobic_third": "aromatic_hydrophobic_preferred",
+        "stacking_hydrophobic_fourth":"aromatic_hydrophobic_preferred",
         "electrostatic":              "non_aromatic_charge_or_ion_preferred",
     }
     ligand_type = ligand_type_map.get(pocket_type, "mixed")
@@ -620,8 +630,7 @@ def summarize_pocket(mask, components, pocket_type, shape, voxel_size, origin,
 def min_distance_mask_to_atoms(mask, voxel_size, origin, atom_xyz):
     if mask is None or np.count_nonzero(mask) == 0 or len(atom_xyz) == 0:
         return np.inf
-    coords = np.column_stack(np.where(mask)).astype(float)
-    xyz    = coords * voxel_size + origin
+    xyz = mask_indices_to_xyz(np.where(mask), voxel_size, origin)
     tree   = cKDTree(atom_xyz)
     dists, _ = tree.query(xyz, k=1, workers=-1)
     return float(np.min(dists)) if len(dists) > 0 else np.inf
@@ -638,8 +647,9 @@ def subtract_mask(mask, exclude_mask):
     return out
 
 def component_from_mask(mask, data, voxel_size, origin, atom_xyz,
-                        field_name, label_seed):
-    if mask is None or np.count_nonzero(mask) < MIN_COMPONENT_VOXELS:
+                        field_name, label_seed,
+                        min_component_voxels=MIN_COMPONENT_VOXELS):
+    if mask is None or np.count_nonzero(mask) < min_component_voxels:
         return None
     idx        = np.where(mask)
     nvox       = len(idx[0])
@@ -649,7 +659,7 @@ def component_from_mask(mask, data, voxel_size, origin, atom_xyz,
     density    = total / nvox
     centroid_idx = np.array([np.mean(idx[0]), np.mean(idx[1]),
                              np.mean(idx[2])], dtype=float)
-    centroid_xyz = centroid_idx * voxel_size + origin
+    centroid_xyz = centroid_idx[[2, 1, 0]] * voxel_size + origin
     comp_xyz     = mask_indices_to_xyz(idx, voxel_size, origin)
     real_buriedness = estimate_real_buriedness_from_atoms(comp_xyz, atom_xyz)
     return {
@@ -660,20 +670,22 @@ def component_from_mask(mask, data, voxel_size, origin, atom_xyz,
     }
 
 def split_components_after_exclusion(comps, exclude_mask, data,
-                                     voxel_size, origin, atom_xyz, field_name):
+                                     voxel_size, origin, atom_xyz, field_name,
+                                     min_component_voxels=MIN_COMPONENT_VOXELS):
     out        = []
     label_seed = 1
     for comp in comps:
         trimmed = subtract_mask(comp["mask"], exclude_mask)
-        if trimmed is None or np.count_nonzero(trimmed) < MIN_COMPONENT_VOXELS:
+        if trimmed is None or np.count_nonzero(trimmed) < min_component_voxels:
             continue
         labels, nlab = connected_components(trimmed)
         for lab in range(1, nlab + 1):
             submask = labels == lab
-            if np.count_nonzero(submask) < MIN_COMPONENT_VOXELS:
+            if np.count_nonzero(submask) < min_component_voxels:
                 continue
             new_comp = component_from_mask(submask, data, voxel_size, origin,
-                                           atom_xyz, field_name, label_seed)
+                                           atom_xyz, field_name, label_seed,
+                                           min_component_voxels=min_component_voxels)
             if new_comp is not None:
                 out.append(new_comp)
                 label_seed += 1
@@ -684,6 +696,9 @@ def select_best_sh_from_component_sets(
         stk_data, hyd_data, apbs_data, pocket_type,
         enforce_structure_nearness=False,
         max_atom_distance=SECOND_POCKET_MAX_ATOM_DISTANCE_A,
+        min_pair_major_voxels=MIN_COMPONENT_VOXELS,
+        min_pair_minor_voxels=MIN_COMPONENT_VOXELS,
+        min_single_voxels=MIN_COMPONENT_VOXELS,
 ):
     sh_overlap_candidates = []
     sh_close_candidates   = []
@@ -691,6 +706,11 @@ def select_best_sh_from_component_sets(
 
     for scomp in stk_comps:
         for hcomp in hyd_comps:
+            pair_major_voxels = max(scomp["nvox"], hcomp["nvox"])
+            pair_minor_voxels = min(scomp["nvox"], hcomp["nvox"])
+            if pair_major_voxels < min_pair_major_voxels or \
+               pair_minor_voxels < min_pair_minor_voxels:
+                continue
             pair_score = score_two_field_pair(scomp, hcomp, shape, voxel_size)
             if pair_score is None:
                 continue
@@ -703,6 +723,10 @@ def select_best_sh_from_component_sets(
                 shape, voxel_size, origin, atom_xyz, stk_data, hyd_data, apbs_data)
             if pocket is None:
                 continue
+            small_partner = pair_minor_voxels < MIN_COMPONENT_VOXELS
+            base_rule = ("stk_hyd_overlap_union"
+                         if pair_score["ov_nvox"] > 0
+                         else "stk_hyd_close_union")
             packed = {
                 "pocket":         pocket,
                 "mask":           pair_mask.copy(),
@@ -711,9 +735,8 @@ def select_best_sh_from_component_sets(
                 "combined_score": pair_score["score"] + 20.0 * pocket["pocket_score"],
                 "buriedness":     pocket["real_buriedness"],
                 "dist":           pair_score["dist"],
-                "selection_rule": ("stk_hyd_overlap_union"
-                                   if pair_score["ov_nvox"] > 0
-                                   else "stk_hyd_close_union"),
+                "selection_rule": (base_rule + "_major_with_small_partner"
+                                   if small_partner else base_rule),
             }
             if pair_score["ov_nvox"] > 0:
                 sh_overlap_candidates.append(packed)
@@ -721,6 +744,8 @@ def select_best_sh_from_component_sets(
                 sh_close_candidates.append(packed)
 
     for comp in stk_comps + hyd_comps:
+        if comp["nvox"] < min_single_voxels:
+            continue
         if comp["real_buriedness"] < REAL_BURIEDNESS_MIN:
             continue
         if enforce_structure_nearness and not mask_is_near_structure(
@@ -867,12 +892,25 @@ def main():
     hyd_labels,  hyd_nlab  = connected_components(hyd_mask)
     apbs_labels, apbs_nlab = connected_components(apbs_mask)
 
+    # Keep the original >=8-voxel component sets for every pre-existing
+    # Pipeline-1 calculation, including the first and second STK-HPb ranks.
     stk_comps  = component_stats(stk_labels,  stk_nlab,  stk_data,
                                  voxel_size, origin, atom_xyz, "stacking")
     hyd_comps  = component_stats(hyd_labels,  hyd_nlab,  hyd_data,
                                  voxel_size, origin, atom_xyz, "hydrophobic")
     apbs_comps = component_stats(apbs_labels, apbs_nlab, apbs_data,
                                  voxel_size, origin, atom_xyz, "apbs")
+
+    # Additional complete component sets used only for STK-HPb ranks 3 and 4.
+    # Components below 8 voxels may act as the minor member of a pair, but the
+    # selector still requires the other member to contain at least 8 voxels;
+    # small-small pairs and small single-field pockets therefore remain invalid.
+    stk_comps_with_small = component_stats(
+        stk_labels, stk_nlab, stk_data, voxel_size, origin, atom_xyz,
+        "stacking", min_component_voxels=MIN_MINOR_PAIR_COMPONENT_VOXELS)
+    hyd_comps_with_small = component_stats(
+        hyd_labels, hyd_nlab, hyd_data, voxel_size, origin, atom_xyz,
+        "hydrophobic", min_component_voxels=MIN_MINOR_PAIR_COMPONENT_VOXELS)
 
     # ── Pocket 1: mixed-fields ───────────────────────────────────────────────
     best_mixed = None
@@ -1001,9 +1039,11 @@ def main():
         save_mrc_from_mask(best_se_mask, stk_file,
                            analysis_dir / f"{pdb}.stacking_electrostatic_pocket.mrc")
 
-    # ── Pocket 3: stacking-hydrophobic (first + second) ─────────────────────
+    # ── Pocket 3: stacking-hydrophobic (first through fourth) ───────────────
     best_sh = None;   best_sh_mask   = None
     second_sh = None; second_sh_mask = None
+    third_sh = None;  third_sh_mask  = None
+    fourth_sh = None; fourth_sh_mask = None
 
     first_ranked_sh = select_best_sh_from_component_sets(
         stk_comps, hyd_comps, shape, voxel_size, origin, atom_xyz,
@@ -1045,6 +1085,78 @@ def main():
         save_mrc_from_mask(second_sh_mask, stk_file,
                            analysis_dir / f"{pdb}.stacking_hydrophobic_second_pocket.mrc")
 
+    # Third-ranked STK-HPb hotspot: exclude every voxel already assigned to
+    # the first- and second-ranked STK-HPb hotspots, then repeat exactly the
+    # same component splitting and selection procedure used for rank two.
+    sh_exclusion_through_second = np.zeros(shape, dtype=bool)
+    for ranked_mask in (best_sh_mask, second_sh_mask):
+        if ranked_mask is not None:
+            sh_exclusion_through_second |= ranked_mask
+
+    stk_comps_third = split_components_after_exclusion(
+        stk_comps_with_small, sh_exclusion_through_second, stk_data,
+        voxel_size, origin, atom_xyz, "stacking",
+        min_component_voxels=MIN_MINOR_PAIR_COMPONENT_VOXELS)
+    hyd_comps_third = split_components_after_exclusion(
+        hyd_comps_with_small, sh_exclusion_through_second, hyd_data,
+        voxel_size, origin, atom_xyz, "hydrophobic",
+        min_component_voxels=MIN_MINOR_PAIR_COMPONENT_VOXELS)
+
+    third_ranked_sh = select_best_sh_from_component_sets(
+        stk_comps_third, hyd_comps_third, shape, voxel_size, origin, atom_xyz,
+        stk_data, hyd_data, apbs_data,
+        pocket_type="stacking_hydrophobic_third",
+        enforce_structure_nearness=True,
+        max_atom_distance=SECOND_POCKET_MAX_ATOM_DISTANCE_A,
+        min_pair_major_voxels=MIN_COMPONENT_VOXELS,
+        min_pair_minor_voxels=MIN_MINOR_PAIR_COMPONENT_VOXELS,
+        min_single_voxels=MIN_COMPONENT_VOXELS,
+    )
+    if third_ranked_sh is not None:
+        third_sh = third_ranked_sh["pocket"]
+        third_sh["combined_score"] = third_ranked_sh["combined_score"]
+        third_sh["selection_rule"] = third_ranked_sh["selection_rule"]
+        third_sh_mask              = third_ranked_sh["mask"]
+
+    if third_sh_mask is not None:
+        save_mrc_from_mask(third_sh_mask, stk_file,
+                           analysis_dir / f"{pdb}.stacking_hydrophobic_third_pocket.mrc")
+
+    # Fourth-ranked STK-HPb hotspot: additionally exclude the third-ranked
+    # hotspot and repeat the same ranked selection once more.
+    sh_exclusion_through_third = sh_exclusion_through_second.copy()
+    if third_sh_mask is not None:
+        sh_exclusion_through_third |= third_sh_mask
+
+    stk_comps_fourth = split_components_after_exclusion(
+        stk_comps_with_small, sh_exclusion_through_third, stk_data,
+        voxel_size, origin, atom_xyz, "stacking",
+        min_component_voxels=MIN_MINOR_PAIR_COMPONENT_VOXELS)
+    hyd_comps_fourth = split_components_after_exclusion(
+        hyd_comps_with_small, sh_exclusion_through_third, hyd_data,
+        voxel_size, origin, atom_xyz, "hydrophobic",
+        min_component_voxels=MIN_MINOR_PAIR_COMPONENT_VOXELS)
+
+    fourth_ranked_sh = select_best_sh_from_component_sets(
+        stk_comps_fourth, hyd_comps_fourth, shape, voxel_size, origin, atom_xyz,
+        stk_data, hyd_data, apbs_data,
+        pocket_type="stacking_hydrophobic_fourth",
+        enforce_structure_nearness=True,
+        max_atom_distance=SECOND_POCKET_MAX_ATOM_DISTANCE_A,
+        min_pair_major_voxels=MIN_COMPONENT_VOXELS,
+        min_pair_minor_voxels=MIN_MINOR_PAIR_COMPONENT_VOXELS,
+        min_single_voxels=MIN_COMPONENT_VOXELS,
+    )
+    if fourth_ranked_sh is not None:
+        fourth_sh = fourth_ranked_sh["pocket"]
+        fourth_sh["combined_score"] = fourth_ranked_sh["combined_score"]
+        fourth_sh["selection_rule"] = fourth_ranked_sh["selection_rule"]
+        fourth_sh_mask              = fourth_ranked_sh["mask"]
+
+    if fourth_sh_mask is not None:
+        save_mrc_from_mask(fourth_sh_mask, stk_file,
+                           analysis_dir / f"{pdb}.stacking_hydrophobic_fourth_pocket.mrc")
+
     # ── Pocket 4: electrostatic ──────────────────────────────────────────────
     best_ele = None; best_ele_mask = None
 
@@ -1070,6 +1182,8 @@ def main():
         ("stacking_electrostatic",      best_se),
         ("stacking_hydrophobic",        best_sh),
         ("stacking_hydrophobic_second", second_sh),
+        ("stacking_hydrophobic_third",  third_sh),
+        ("stacking_hydrophobic_fourth", fourth_sh),
         ("electrostatic",               best_ele),
     ]
 
@@ -1129,6 +1243,8 @@ def main():
         f"{pdb}.stacking_electrostatic_pocket.mrc",
         f"{pdb}.stacking_hydrophobic_pocket.mrc",
         f"{pdb}.stacking_hydrophobic_second_pocket.mrc",
+        f"{pdb}.stacking_hydrophobic_third_pocket.mrc",
+        f"{pdb}.stacking_hydrophobic_fourth_pocket.mrc",
         f"{pdb}.electrostatic_pocket.mrc",
         f"{pdb}.predicted_binding_pockets_summary.csv",
     ]:
