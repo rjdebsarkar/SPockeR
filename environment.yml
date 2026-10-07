@@ -14,5 +14,6 @@ dependencies:
   - apbs
   - pip
   - pip:
+      - scikit-image
       - mrcfile
       - volgrids==1.0.0
